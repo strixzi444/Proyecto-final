@@ -1,63 +1,1922 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pronóstico</title>
-<!--
-  ESQUELETO DEL FRONTEND
-  ======================
-  Esta página ya funciona: pide el pronóstico a la API y lo muestra en una
-  tabla sin formato. Tu trabajo es convertirla en una interfaz de verdad.
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="artifact-type" content="dashboard">
+  <meta name="design-style" content="aurora">
+  <title>Pronóstico de Series de Tiempo · Monitor de Sensores</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@1.43.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
 
-  Requisitos mínimos (ver README, Fase 2):
-    1. Una gráfica con el histórico, el pronóstico y el intervalo de confianza.
-    2. Las horas en hora de Colombia (la API las entrega en UTC, con "Z").
-    3. Al menos un indicador destacado (p.ej. valor de la próxima hora,
-       máximo esperado, hora del último dato).
-    4. Controles para elegir cuántas horas pronosticar.
-    5. Un mensaje claro cuando la API responde con error.
+      /* Page and surfaces: deep oceanic slate steps */
+      --background: #0c1214;
+      --surface-container-low: #111a1e;
+      --surface-container: #152024;
+      --surface-container-high: #1c2a30;
 
-  Puedes usar cualquier librería de gráficas cargada desde un CDN
-  (Chart.js, Plotly, ECharts...) y poner archivos .css o .js en esta misma
-  carpeta: se sirven en /static/<nombre>.
+      /* Text */
+      --on-surface: #edf3f5;
+      --on-surface-variant: #94a8b0;
 
-  Endpoints disponibles (pruébalos en /docs):
-    GET /api/prediccion?horas=12&historia=48&confianza=0.95
-    GET /api/historico?horas=48
-    GET /api/modelo
-    GET /api/salud
--->
+      /* Borders */
+      --outline: #38515c;
+      --outline-variant: #213138;
+
+      /* Accents */
+      --primary: #63c7d6;
+      --on-primary: #081214;
+      --primary-container: #163840;
+      --on-primary-container: #c7f0f7;
+      --secondary: #5d7882;
+      --tertiary: #87d69b;
+      --error: #f27474;
+      --on-error: #1a0606;
+
+      /* Data series */
+      --data-1: #63c7d6;
+      --data-2: #87d69b;
+      --data-3: #e8b954;
+      --data-4: #f08c70;
+      --data-context: #7b949e;
+
+      /* Chart translucent fills */
+      --chart-ci-fill: rgba(99, 199, 214, 0.14);
+      --chart-ci-border: rgba(99, 199, 214, 0.42);
+      --chart-hist-fill: rgba(135, 214, 155, 0.08);
+      --chart-grid: rgba(56, 81, 92, 0.35);
+
+      /* Fonts */
+      --font-headline: 'Instrument Sans', sans-serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-label: 'Geist Mono', monospace;
+
+      /* Shape */
+      --rounded: 0.5rem;
+      --rounded-lg: 0.75rem;
+      --rounded-full: 9999px;
+
+      /* Style effects */
+      --hairline: 1px solid var(--outline-variant);
+      --hairline-strong: 1px solid var(--outline);
+      --panel-gradient: linear-gradient(180deg, #162226 0%, #111a1e 100%);
+      --heading-tracking: -0.025em;
+      --label-tracking: 0.06em;
+      --sage-tint: color-mix(in srgb, var(--tertiary) 13%, transparent);
+      --cyan-tint: color-mix(in srgb, var(--primary) 13%, transparent);
+      --amber-tint: color-mix(in srgb, var(--warning) 14%, transparent);
+      --error-tint: color-mix(in srgb, var(--error) 12%, transparent);
+
+      /* Shared semantic & focus tokens */
+      --positive: #87d69b;
+      --warning: #e8b954;
+      --focus: #63c7d6;
+
+      /* Type scale (Dashboard / Data Explorer) */
+      --display-size: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
+      --headline-size: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
+      --subhead-size: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+      --body-size: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
+      --label-size: 0.75rem;
+
+      /* Spacing scale (4pt base) */
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2.5rem;
+      --space-2xl: 4rem;
+
+      /* Motion */
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+      --dur-micro: 120ms;
+      --dur-short: 220ms;
+      --dur-long: 420ms;
+    }
+
+    /* Base reset */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      overflow-x: clip;
+      margin: 0;
+      padding: 0;
+      background-color: var(--background);
+      color: var(--on-surface);
+      font-family: var(--font-body);
+      font-size: var(--body-size);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    header { position: static !important; }
+
+    button, input, select, textarea {
+      font-family: inherit;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .page-grid {
+      display: grid;
+      gap: var(--space-lg);
+      padding: var(--space-lg);
+      max-width: 1280px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    .page-grid * { min-width: 0; }
+
+    /* Header */
+    .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: var(--space-md);
+      padding-bottom: var(--space-md);
+      border-bottom: var(--hairline);
+    }
+
+    .header-copy {
+      max-width: 65ch;
+      display: grid;
+      gap: var(--space-xs);
+    }
+
+    .title {
+      margin: 0;
+      font-family: var(--font-headline);
+      font-size: var(--display-size);
+      font-weight: 600;
+      letter-spacing: var(--heading-tracking);
+      line-height: 1.1;
+      color: var(--on-surface);
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--on-surface-variant);
+      font-size: var(--body-size);
+    }
+
+    .tz-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      background: var(--surface-container);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-sm) var(--space-md);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      color: var(--primary);
+      white-space: nowrap;
+    }
+
+    /* Panels */
+    .panel {
+      background: var(--panel-gradient);
+      border: var(--hairline);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-lg);
+      transition: border-color var(--dur-short) var(--ease-out);
+    }
+
+    .data-label {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-weight: 500;
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+      margin: 0;
+    }
+
+    /* Error Banner */
+    .error-banner {
+      background: var(--error-tint);
+      border: 1px solid color-mix(in srgb, var(--error) 45%, transparent);
+      border-left: 4px solid var(--error);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-md) var(--space-lg);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-md);
+      align-items: center;
+    }
+
+    .error-banner[hidden] {
+      display: none;
+    }
+
+    .error-content {
+      display: grid;
+      gap: var(--space-xs);
+    }
+
+    .error-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      color: var(--error);
+      font-family: var(--font-headline);
+      font-weight: 600;
+      font-size: var(--subhead-size);
+      margin: 0;
+    }
+
+    .error-detail {
+      margin: 0;
+      color: var(--on-surface);
+      font-family: var(--font-label);
+      font-size: 0.875rem;
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-sm) var(--space-md);
+      word-break: break-word;
+    }
+
+    .error-hint {
+      margin: 0;
+      color: var(--on-surface-variant);
+      font-size: 0.875rem;
+    }
+
+    .error-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      align-items: center;
+    }
+
+    /* Controls Bar */
+    .controls-panel {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.5fr) minmax(160px, 1fr) minmax(160px, 1fr) auto;
+      gap: var(--space-md);
+      align-items: end;
+    }
+
+    .control-group {
+      display: grid;
+      gap: var(--space-sm);
+    }
+
+    .control-label {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-weight: 500;
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+    }
+
+    .horizon-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      align-items: center;
+    }
+
+    .preset-group {
+      display: inline-flex;
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: 3px;
+      gap: var(--space-xs);
+    }
+
+    .preset-btn {
+      min-height: 38px;
+      padding: 0 var(--space-sm);
+      border: none;
+      border-radius: calc(var(--rounded) - 2px);
+      background: transparent;
+      color: var(--on-surface-variant);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+    }
+
+    .preset-btn:hover {
+      background: var(--surface-container-high);
+      color: var(--on-surface);
+    }
+
+    .preset-btn.is-active {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+    }
+
+    .well-input,
+    .well-select {
+      min-height: 44px;
+      background: var(--background);
+      color: var(--on-surface);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: 0 var(--space-md);
+      font-family: var(--font-label);
+      font-size: 0.9375rem;
+      transition: border-color var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out);
+    }
+
+    .well-input {
+      width: 92px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .well-select {
+      width: 100%;
+      padding-right: var(--space-xl);
+      cursor: pointer;
+    }
+
+    .well-input:hover,
+    .well-select:hover {
+      border-color: var(--outline);
+    }
+
+    .well-input:focus-visible,
+    .well-select:focus-visible {
+      border-color: var(--primary);
+    }
+
+    /* Buttons */
+    .btn-primary {
+      min-height: 44px;
+      padding: var(--space-sm) var(--space-lg);
+      background: var(--primary);
+      color: var(--on-primary);
+      border: none;
+      border-radius: var(--rounded);
+      font-family: var(--font-headline);
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      white-space: nowrap;
+      transition: background-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out), opacity var(--dur-micro) var(--ease-out);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--primary) 88%, var(--on-surface));
+    }
+
+    .btn-primary:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .btn-secondary {
+      min-height: 44px;
+      padding: var(--space-sm) var(--space-md);
+      background: transparent;
+      color: var(--on-surface);
+      border: var(--hairline-strong);
+      border-radius: var(--rounded);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      white-space: nowrap;
+      transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--surface-container-high);
+      border-color: var(--primary);
+    }
+
+    .btn-secondary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+      gap: var(--space-md);
+    }
+
+    .kpi-card {
+      display: grid;
+      gap: var(--space-sm);
+      align-content: start;
+      container-type: inline-size;
+    }
+
+    .kpi-card.kpi-featured {
+      border-color: color-mix(in srgb, var(--primary) 42%, var(--outline-variant));
+    }
+
+    .kpi-value {
+      margin: 0;
+      font-family: var(--font-headline);
+      font-size: clamp(1.625rem, 1.35rem + 0.9vw, 2.125rem);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: var(--heading-tracking);
+      line-height: 1.1;
+      color: var(--on-surface);
+    }
+
+    .kpi-sub {
+      margin: 0;
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--on-surface-variant);
+      line-height: 1.4;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      width: fit-content;
+      border-radius: var(--rounded);
+      padding: 3px var(--space-sm);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-weight: 500;
+    }
+
+    .status-chip.is-sage {
+      background: var(--sage-tint);
+      color: var(--tertiary);
+      border: 1px solid color-mix(in srgb, var(--tertiary) 35%, transparent);
+    }
+
+    .status-chip.is-amber {
+      background: var(--amber-tint);
+      color: var(--warning);
+      border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+    }
+
+    .status-chip.is-error {
+      background: var(--error-tint);
+      color: var(--error);
+      border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
+    }
+
+    .status-chip.is-cyan {
+      background: var(--cyan-tint);
+      color: var(--primary);
+      border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+    }
+
+    /* Chart Panel */
+    .chart-panel {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .chart-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-md);
+    }
+
+    .section-title {
+      margin: 0;
+      font-family: var(--font-headline);
+      font-size: var(--headline-size);
+      font-weight: 600;
+      letter-spacing: var(--heading-tracking);
+      color: var(--on-surface);
+    }
+
+    .chart-subtitle {
+      margin: var(--space-xs) 0 0 0;
+      font-size: 0.875rem;
+      color: var(--on-surface-variant);
+    }
+
+    .chart-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .legend-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-md);
+      align-items: center;
+      padding: var(--space-sm) var(--space-md);
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--on-surface-variant);
+    }
+
+    .swatch-line {
+      width: 18px;
+      height: 3px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    .swatch-hist { background: var(--data-2); }
+    .swatch-pred {
+      background: repeating-linear-gradient(
+        90deg,
+        var(--data-1) 0 5px,
+        transparent 5px 8px
+      );
+    }
+    .swatch-band {
+      width: 16px;
+      height: 12px;
+      border-radius: 2px;
+      background: var(--chart-ci-fill);
+      border: 1px dashed var(--chart-ci-border);
+      display: inline-block;
+    }
+
+    .chart-box {
+      position: relative;
+      width: 100%;
+      min-height: 400px;
+      height: 420px;
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-md);
+    }
+
+    .chart-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: var(--space-sm);
+      padding: var(--space-lg);
+      color: var(--on-surface-variant);
+      background: var(--background);
+      border-radius: var(--rounded);
+      z-index: 2;
+    }
+
+    .chart-empty[hidden] {
+      display: none;
+    }
+
+    .meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: var(--space-sm) var(--space-lg);
+      padding-top: var(--space-sm);
+      border-top: var(--hairline);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--on-surface-variant);
+    }
+
+    /* Lower asymmetric grid (8 + 4 ratio) */
+    .lower-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+      gap: var(--space-lg);
+      align-items: start;
+    }
+
+    .table-panel,
+    .diag-panel {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .panel-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+      max-height: 390px;
+      overflow-y: auto;
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      background: var(--background);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--surface-container-high);
+      color: var(--on-surface-variant);
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-weight: 500;
+      letter-spacing: var(--label-tracking);
+      text-transform: uppercase;
+      text-align: left;
+      padding: var(--space-sm) var(--space-md);
+      border-bottom: var(--hairline);
+      white-space: nowrap;
+      z-index: 1;
+    }
+
+    thead th.num,
+    tbody td.num {
+      text-align: right;
+    }
+
+    tbody td {
+      padding: var(--space-sm) var(--space-md);
+      border-bottom: var(--hairline);
+      font-family: var(--font-label);
+      font-variant-numeric: tabular-nums;
+      color: var(--on-surface);
+      white-space: nowrap;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: var(--surface-container-low);
+    }
+
+    td.muted-col {
+      color: var(--on-surface-variant);
+    }
+
+    td.accent-col {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* Diagnostics / Health & Model list */
+    .diag-list {
+      margin: 0;
+      display: grid;
+      gap: 0;
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      overflow: hidden;
+    }
+
+    .diag-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-sm) var(--space-md);
+      border-bottom: var(--hairline);
+    }
+
+    .diag-row:last-child {
+      border-bottom: none;
+    }
+
+    .diag-row dt {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--on-surface-variant);
+      text-transform: uppercase;
+      letter-spacing: var(--label-tracking);
+    }
+
+    .diag-row dd {
+      margin: 0;
+      font-family: var(--font-label);
+      font-size: 0.8125rem;
+      color: var(--on-surface);
+      text-align: right;
+      word-break: break-all;
+    }
+
+    .diag-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .page-footer {
+      padding-top: var(--space-md);
+      border-top: var(--hairline);
+      color: var(--on-surface-variant);
+      font-size: 0.8125rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: var(--space-sm);
+    }
+
+    .spin {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 960px) {
+      .controls-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .lower-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page-grid {
+        padding: var(--space-md);
+        gap: var(--space-md);
+      }
+      .controls-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .error-banner {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .chart-box {
+        min-height: 320px;
+        height: 340px;
+        padding: var(--space-sm);
+      }
+      .panel {
+        padding: var(--space-md);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Pronóstico</h1>
-  <p id="estado">Consultando la API…</p>
-  <table border="1" cellpadding="4">
-    <thead><tr><th>tiempo (UTC)</th><th>prediccion</th><th>limite_inferior</th><th>limite_superior</th></tr></thead>
-    <tbody id="filas"></tbody>
-  </table>
+  <main class="page-grid">
+    <!-- Header -->
+    <header class="page-header">
+      <div class="header-copy">
+        <h1 class="title">Pronóstico de Series de Tiempo</h1>
+        <p class="subtitle">
+          Predicción horaria con modelo SARIMA alimentado por telemetría de sensores en InfluxDB.
+        </p>
+      </div>
+      <div class="tz-badge" aria-label="Zona horaria activa: Colombia UTC menos 5">
+        <i data-lucide="clock" aria-hidden="true" width="14" height="14"></i>
+        <span>Hora Colombia · America/Bogota (UTC−5)</span>
+      </div>
+    </header>
 
-<script>
-async function cargar() {
-  const estado = document.getElementById("estado");
-  try {
-    const respuesta = await fetch("/api/prediccion?horas=12&historia=48");
-    const datos = await respuesta.json();
-    if (!respuesta.ok) throw new Error(datos.detail);
+    <!-- Error Banner (Requisito 5) -->
+    <section id="error-banner" class="error-banner" role="alert" aria-live="assertive" hidden>
+      <div class="error-content">
+        <h2 id="error-title" class="error-header">
+          <i data-lucide="alert-triangle" aria-hidden="true" width="18" height="18"></i>
+          <span>Error al consultar la API de pronóstico</span>
+        </h2>
+        <p id="error-message" class="error-detail">No fue posible obtener datos del servidor.</p>
+        <p id="error-hint" class="error-hint">
+          Verifica que el servicio FastAPI esté activo y que las variables de InfluxDB y el archivo del modelo estén configurados.
+        </p>
+      </div>
+      <div class="error-actions">
+        <button id="btn-reintentar" type="button" class="btn-primary" onclick="reintentarConexion()">
+          <i data-lucide="refresh-cw" aria-hidden="true" width="16" height="16"></i>
+          <span>Reintentar</span>
+        </button>
+        <button id="btn-preview-toggle" type="button" class="btn-secondary" onclick="cargarVistaPreviaSimulada()" hidden>
+          <span>Ver datos de demostración</span>
+        </button>
+      </div>
+    </section>
 
-    // datos.historico  -> [{tiempo, valor}, ...]            (horas pasadas)
-    // datos.prediccion -> [{tiempo, prediccion, limite_inferior, limite_superior}, ...]
-    console.log(datos);   // abre la consola del navegador (F12) para explorarlo
+    <!-- Interactive Controls (Requisito 4) -->
+    <section class="panel controls-panel" aria-label="Controles de consulta del pronóstico">
+      <div class="controls-grid">
+        <div class="control-group">
+          <label class="control-label" for="input-horas">Horas a pronosticar (horizonte)</label>
+          <div class="horizon-row">
+            <div class="preset-group" role="group" aria-label="Accesos rápidos de horizonte">
+              <button id="preset-6" type="button" class="preset-btn" onclick="seleccionarHorizonte(6)">6 h</button>
+              <button id="preset-12" type="button" class="preset-btn is-active" onclick="seleccionarHorizonte(12)">12 h</button>
+              <button id="preset-24" type="button" class="preset-btn" onclick="seleccionarHorizonte(24)">24 h</button>
+              <button id="preset-48" type="button" class="preset-btn" onclick="seleccionarHorizonte(48)">48 h</button>
+            </div>
+            <input
+              id="input-horas"
+              class="well-input"
+              type="number"
+              min="1"
+              max="168"
+              step="1"
+              value="12"
+              aria-label="Número personalizado de horas a pronosticar"
+              oninput="alCambiarInputHoras(this.value)"
+            >
+          </div>
+        </div>
 
-    document.getElementById("filas").innerHTML = datos.prediccion.map(p =>
-      `<tr><td>${p.tiempo}</td><td>${p.prediccion}</td><td>${p.limite_inferior}</td><td>${p.limite_superior}</td></tr>`
-    ).join("");
-    estado.textContent = `Último dato real: ${datos.ultima_observacion}`;
-  } catch (error) {
-    estado.textContent = "Error: " + error.message;
-  }
-}
-cargar();
-</script>
+        <div class="control-group">
+          <label class="control-label" for="select-historia">Horas de historia</label>
+          <select id="select-historia" class="well-select" onchange="guardarPreferencias()">
+            <option value="24">24 horas (1 día)</option>
+            <option value="48" selected>48 horas (2 días)</option>
+            <option value="72">72 horas (3 días)</option>
+            <option value="168">168 horas (7 días)</option>
+            <option value="336">336 horas (14 días)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label" for="select-confianza">Nivel de confianza</label>
+          <select id="select-confianza" class="well-select" onchange="guardarPreferencias()">
+            <option value="0.80">80% (IC estrecho)</option>
+            <option value="0.90">90% (IC moderado)</option>
+            <option value="0.95" selected>95% (IC estándar)</option>
+            <option value="0.99">99% (IC amplio)</option>
+          </select>
+        </div>
+
+        <button id="btn-actualizar" type="button" class="btn-primary" onclick="actualizarPronostico()">
+          <i data-lucide="refresh-cw" aria-hidden="true" width="16" height="16"></i>
+          <span>Actualizar pronóstico</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- KPIs (Requisito 3) -->
+    <section class="kpi-grid" aria-label="Indicadores principales">
+      <article class="panel kpi-card kpi-featured">
+        <p class="data-label">Próxima hora (t+1)</p>
+        <p id="kpi-proxima-valor" class="kpi-value">—</p>
+        <p id="kpi-proxima-detalle" class="kpi-sub">Esperando consulta al endpoint</p>
+      </article>
+
+      <article class="panel kpi-card">
+        <p class="data-label">Máximo esperado</p>
+        <p id="kpi-maximo-valor" class="kpi-value">—</p>
+        <p id="kpi-maximo-detalle" class="kpi-sub">Pico dentro del horizonte seleccionado</p>
+      </article>
+
+      <article class="panel kpi-card">
+        <p class="data-label">Último dato observado</p>
+        <p id="kpi-ultima-hora" class="kpi-value">—</p>
+        <p id="kpi-ultima-detalle" class="kpi-sub">Convertido de UTC a America/Bogota</p>
+      </article>
+
+      <article class="panel kpi-card">
+        <p class="data-label">Horas rellenadas</p>
+        <p id="kpi-rellenadas-valor" class="kpi-value">—</p>
+        <span id="kpi-rellenadas-chip" class="status-chip is-cyan">Sin evaluar</span>
+        <p id="kpi-rellenadas-detalle" class="kpi-sub">Continuidad de lectura del sensor</p>
+      </article>
+    </section>
+
+    <!-- Chart Section (Requisitos 1 y 2) -->
+    <section class="panel chart-panel" aria-label="Gráfica interactiva de histórico y pronóstico">
+      <div class="chart-header">
+        <div>
+          <h2 class="section-title">Histórico observado y pronóstico SARIMA</h2>
+          <p id="chart-subtitle" class="chart-subtitle">
+            Eje temporal en hora de Colombia (America/Bogota, UTC−5) · Banda sombreada de intervalo de confianza al 95%
+          </p>
+        </div>
+
+        <div class="chart-toolbar">
+          <div class="legend-inline" aria-label="Leyenda de series">
+            <span class="legend-item">
+              <span class="swatch-line swatch-hist" aria-hidden="true"></span>
+              <span>Histórico</span>
+            </span>
+            <span class="legend-item">
+              <span class="swatch-line swatch-pred" aria-hidden="true"></span>
+              <span>Pronóstico</span>
+            </span>
+            <span class="legend-item">
+              <span class="swatch-band" aria-hidden="true"></span>
+              <span>Intervalo de confianza</span>
+            </span>
+          </div>
+
+          <button id="btn-exportar" type="button" class="btn-secondary" onclick="exportarCSV()" disabled>
+            <i data-lucide="download" aria-hidden="true" width="15" height="15"></i>
+            <span>Exportar CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="chart-box">
+        <canvas
+          id="forecast-chart"
+          role="img"
+          aria-label="Gráfica de línea con datos históricos, pronóstico futuro e intervalo de confianza sombreado en hora de Colombia"
+        ></canvas>
+        <div id="chart-empty-state" class="chart-empty" hidden>
+          <i data-lucide="activity" aria-hidden="true" width="28" height="28"></i>
+          <strong>No hay serie disponible para graficar</strong>
+          <span>Revisa el mensaje de error superior o actualiza los parámetros de consulta.</span>
+        </div>
+      </div>
+
+      <div class="meta-strip">
+        <span id="meta-contexto">Contexto del modelo: —</span>
+        <span id="meta-fuente">Origen: /api/prediccion</span>
+        <span id="meta-actualizado">Última consulta: —</span>
+      </div>
+    </section>
+
+    <!-- Detail Table + Service Diagnostics -->
+    <div class="lower-grid">
+      <section class="panel table-panel" aria-label="Detalle numérico del pronóstico">
+        <div class="panel-head">
+          <div>
+            <h2 class="section-title">Tabla horaria del pronóstico</h2>
+            <p class="chart-subtitle">Valores proyectados y límites del intervalo en hora de Colombia</p>
+          </div>
+        </div>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Hora Colombia (UTC−5)</th>
+                <th scope="col">UTC origen</th>
+                <th scope="col" class="num">Pronóstico</th>
+                <th scope="col" class="num">Lím. inferior</th>
+                <th scope="col" class="num">Lím. superior</th>
+                <th scope="col" class="num">Amplitud IC</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-pronostico-body">
+              <tr>
+                <td colspan="6" class="muted-col">Cargando datos del pronóstico…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside class="panel diag-panel" aria-label="Estado del servicio y metadatos del modelo">
+        <div class="panel-head">
+          <div>
+            <h2 class="section-title">Salud y modelo</h2>
+            <p class="chart-subtitle">Verificación de /api/salud y /api/modelo</p>
+          </div>
+        </div>
+
+        <dl class="diag-list">
+          <div class="diag-row">
+            <dt>Estado API</dt>
+            <dd id="salud-estado">Consultando…</dd>
+          </div>
+          <div class="diag-row">
+            <dt>atendido_por</dt>
+            <dd id="salud-atendido">—</dd>
+          </div>
+          <div class="diag-row">
+            <dt>modelo_cargado</dt>
+            <dd id="salud-modelo">—</dd>
+          </div>
+          <div class="diag-row">
+            <dt>influx_configurado</dt>
+            <dd id="salud-influx">—</dd>
+          </div>
+          <div class="diag-row">
+            <dt>modelo_demo</dt>
+            <dd id="salud-demo">—</dd>
+          </div>
+          <div class="diag-row">
+            <dt>Parámetros SARIMA</dt>
+            <dd id="modelo-detalle">—</dd>
+          </div>
+        </dl>
+
+        <div class="diag-actions">
+          <button type="button" class="btn-secondary" onclick="consultarSaludYModelo()">
+            <i data-lucide="server" aria-hidden="true" width="15" height="15"></i>
+            <span>Refrescar salud</span>
+          </button>
+          <button id="btn-simular-error" type="button" class="btn-secondary" onclick="simularErrorPrueba()">
+            <i data-lucide="shield-alert" aria-hidden="true" width="15" height="15"></i>
+            <span>Simular fallo API</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="page-footer">
+      <span>Servicio FastAPI + SARIMA + InfluxDB · Proyecto de Computación Avanzada</span>
+      <span>Conversión automática de marcas UTC (Z) a America/Bogota (UTC−5)</span>
+    </footer>
+  </main>
+
+  <api-shim></api-shim>
+  <script>
+    let chartInstance = null;
+    let currentForecastData = null;
+    let hasConnectedLiveApi = false;
+    let isPreviewSimulated = false;
+    let isFetching = false;
+
+    const COLOMBIA_TZ = 'America/Bogota';
+
+    function getCssVar(name, fallback) {
+      const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return val || fallback;
+    }
+
+    function parseUtcDate(isoString) {
+      if (!isoString) return null;
+      const normalized = String(isoString).trim();
+      const date = new Date(normalized);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function formatColombiaFull(isoString) {
+      const date = parseUtcDate(isoString);
+      if (!date) return '—';
+      return new Intl.DateTimeFormat('es-CO', {
+        timeZone: COLOMBIA_TZ,
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(date);
+    }
+
+    function formatColombiaShort(isoString) {
+      const date = parseUtcDate(isoString);
+      if (!date) return '—';
+      return new Intl.DateTimeFormat('es-CO', {
+        timeZone: COLOMBIA_TZ,
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(date);
+    }
+
+    function formatColombiaTimeOnly(isoString) {
+      const date = parseUtcDate(isoString);
+      if (!date) return '—';
+      return new Intl.DateTimeFormat('es-CO', {
+        timeZone: COLOMBIA_TZ,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(date);
+    }
+
+    function formatUtcCompact(isoString) {
+      const date = parseUtcDate(isoString);
+      if (!date) return '—';
+      return date.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+    }
+
+    function formatNum(val, decimals = 2) {
+      if (typeof val !== 'number' || !Number.isFinite(val)) return '—';
+      return new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      }).format(val);
+    }
+
+    function getParamsFromControls() {
+      const horasInput = document.getElementById('input-horas');
+      const historiaSelect = document.getElementById('select-historia');
+      const confianzaSelect = document.getElementById('select-confianza');
+
+      let horas = horasInput ? parseInt(horasInput.value, 10) : 12;
+      if (!Number.isFinite(horas) || horas < 1) horas = 1;
+      if (horas > 168) horas = 168;
+      if (horasInput) horasInput.value = String(horas);
+
+      const historia = historiaSelect ? parseInt(historiaSelect.value, 10) || 48 : 48;
+      const confianza = confianzaSelect ? parseFloat(confianzaSelect.value) || 0.95 : 0.95;
+
+      return { horas, historia, confianza };
+    }
+
+    function syncPresetButtons(horas) {
+      const presets = [6, 12, 24, 48];
+      presets.forEach(function (val) {
+        const btn = document.getElementById(`preset-${val}`);
+        if (btn) {
+          btn.classList.toggle('is-active', Number(horas) === val);
+        }
+      });
+    }
+
+    async function guardarPreferencias() {
+      const params = getParamsFromControls();
+      syncPresetButtons(params.horas);
+      if (window.notebookAppApi && typeof window.notebookAppApi.setAppState === 'function') {
+        try {
+          await window.notebookAppApi.setAppState(params);
+        } catch (_err) {
+          // Ignore shim errors outside sandbox
+        }
+      }
+    }
+
+    function seleccionarHorizonte(horas) {
+      const input = document.getElementById('input-horas');
+      if (input) input.value = String(horas);
+      syncPresetButtons(horas);
+      guardarPreferencias();
+      actualizarPronostico();
+    }
+
+    function alCambiarInputHoras(val) {
+      const num = parseInt(val, 10);
+      syncPresetButtons(num);
+      guardarPreferencias();
+    }
+
+    function setLoadingState(loading) {
+      isFetching = loading;
+      const btn = document.getElementById('btn-actualizar');
+      if (!btn) return;
+      btn.disabled = loading;
+      btn.setAttribute('aria-busy', loading ? 'true' : 'false');
+      btn.innerHTML = loading
+        ? `<i data-lucide="loader-2" class="spin" aria-hidden="true" width="16" height="16"></i><span>Consultando…</span>`
+        : `<i data-lucide="refresh-cw" aria-hidden="true" width="16" height="16"></i><span>Actualizar pronóstico</span>`;
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function showErrorBanner(title, detail, hint, showPreviewBtn) {
+      const banner = document.getElementById('error-banner');
+      const titleEl = document.getElementById('error-title');
+      const msgEl = document.getElementById('error-message');
+      const hintEl = document.getElementById('error-hint');
+      const previewBtn = document.getElementById('btn-preview-toggle');
+
+      if (titleEl) {
+        titleEl.innerHTML = `<i data-lucide="alert-triangle" aria-hidden="true" width="18" height="18"></i><span>${escapeHtml(title)}</span>`;
+      }
+      if (msgEl) msgEl.textContent = detail;
+      if (hintEl) hintEl.textContent = hint;
+      if (previewBtn) previewBtn.hidden = !showPreviewBtn;
+      if (banner) banner.hidden = false;
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function hideErrorBanner() {
+      const banner = document.getElementById('error-banner');
+      if (banner) banner.hidden = true;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = String(text ?? '');
+      return div.innerHTML;
+    }
+
+    function clearDashboardOnFatalError() {
+      currentForecastData = null;
+      const exportBtn = document.getElementById('btn-exportar');
+      if (exportBtn) exportBtn.disabled = true;
+
+      const setText = function (id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+      };
+      setText('kpi-proxima-valor', '—');
+      setText('kpi-proxima-detalle', 'Sin datos por error en la API');
+      setText('kpi-maximo-valor', '—');
+      setText('kpi-maximo-detalle', 'No disponible');
+      setText('kpi-ultima-hora', '—');
+      setText('kpi-ultima-detalle', 'No disponible');
+      setText('kpi-rellenadas-valor', '—');
+      setText('kpi-rellenadas-detalle', 'No disponible');
+
+      const chip = document.getElementById('kpi-rellenadas-chip');
+      if (chip) {
+        chip.className = 'status-chip is-error';
+        chip.textContent = 'Error de consulta';
+      }
+
+      const tbody = document.getElementById('tabla-pronostico-body');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" class="muted-col">No se pudieron cargar filas de pronóstico debido al error en la API.</td></tr>`;
+      }
+
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+      const emptyState = document.getElementById('chart-empty-state');
+      if (emptyState) emptyState.hidden = false;
+    }
+
+    function renderKPIs(data) {
+      const historico = Array.isArray(data.historico) ? data.historico : [];
+      const prediccion = Array.isArray(data.prediccion) ? data.prediccion : [];
+      const lastHist = historico.length ? historico[historico.length - 1] : null;
+      const nextPred = prediccion.length ? prediccion[0] : null;
+
+      // 1. Próxima hora
+      const proxValEl = document.getElementById('kpi-proxima-valor');
+      const proxDetEl = document.getElementById('kpi-proxima-detalle');
+      if (nextPred && proxValEl && proxDetEl) {
+        proxValEl.textContent = formatNum(nextPred.prediccion);
+        let deltaText = '';
+        if (lastHist && typeof lastHist.valor === 'number' && lastHist.valor !== 0) {
+          const diff = nextPred.prediccion - lastHist.valor;
+          const pct = (diff / Math.abs(lastHist.valor)) * 100;
+          const sign = diff >= 0 ? '+' : '';
+          deltaText = ` (${sign}${formatNum(diff)} / ${sign}${formatNum(pct, 1)}%)`;
+        }
+        proxDetEl.textContent = `${formatColombiaShort(nextPred.tiempo)} COT${deltaText} · IC [${formatNum(nextPred.limite_inferior)} – ${formatNum(nextPred.limite_superior)}]`;
+      }
+
+      // 2. Máximo esperado
+      const maxValEl = document.getElementById('kpi-maximo-valor');
+      const maxDetEl = document.getElementById('kpi-maximo-detalle');
+      if (prediccion.length && maxValEl && maxDetEl) {
+        let maxPoint = prediccion[0];
+        prediccion.forEach(function (pt) {
+          if (pt.prediccion > maxPoint.prediccion) maxPoint = pt;
+        });
+        maxValEl.textContent = formatNum(maxPoint.prediccion);
+        maxDetEl.textContent = `Esperado el ${formatColombiaShort(maxPoint.tiempo)} COT · Techo IC ${formatNum(maxPoint.limite_superior)}`;
+      }
+
+      // 3. Último dato observado
+      const ultHoraEl = document.getElementById('kpi-ultima-hora');
+      const ultDetEl = document.getElementById('kpi-ultima-detalle');
+      const ultimaIso = data.ultima_observacion || (lastHist ? lastHist.tiempo : null);
+      if (ultHoraEl && ultDetEl) {
+        ultHoraEl.textContent = ultimaIso ? `${formatColombiaTimeOnly(ultimaIso)} COT` : '—';
+        const valorObs = lastHist ? `Valor: ${formatNum(lastHist.valor)} · ` : '';
+        ultDetEl.textContent = ultimaIso
+          ? `${valorObs}${formatColombiaFull(ultimaIso)} (UTC: ${formatUtcCompact(ultimaIso)})`
+          : 'Sin timestamp disponible';
+      }
+
+      // 4. Horas rellenadas
+      const rellValEl = document.getElementById('kpi-rellenadas-valor');
+      const rellDetEl = document.getElementById('kpi-rellenadas-detalle');
+      const rellChipEl = document.getElementById('kpi-rellenadas-chip');
+      const rellenadas = Number(data.horas_rellenadas ?? 0);
+      const contexto = Number(data.horas_contexto_usadas ?? 0);
+      if (rellValEl && rellDetEl && rellChipEl) {
+        rellValEl.textContent = `${rellenadas} h`;
+        rellDetEl.textContent = contexto > 0
+          ? `De ${contexto} h de contexto usadas por el SARIMA`
+          : `Horas imputadas por huecos en el sensor`;
+
+        if (rellenadas === 0) {
+          rellChipEl.className = 'status-chip is-sage';
+          rellChipEl.textContent = 'Serie continua · Sin huecos';
+        } else if (rellenadas <= 12) {
+          rellChipEl.className = 'status-chip is-amber';
+          rellChipEl.textContent = 'Interpolación leve · Revisar sensor';
+        } else {
+          rellChipEl.className = 'status-chip is-error';
+          rellChipEl.textContent = 'Sensor con caídas · Menor confianza';
+        }
+      }
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('tabla-pronostico-body');
+      if (!tbody) return;
+      const prediccion = Array.isArray(data.prediccion) ? data.prediccion : [];
+      if (!prediccion.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="muted-col">No hay puntos de pronóstico disponibles.</td></tr>`;
+        return;
+      }
+
+      const rows = prediccion.map(function (pt) {
+        const amplitud = pt.limite_superior - pt.limite_inferior;
+        return `
+          <tr>
+            <td>${escapeHtml(formatColombiaFull(pt.tiempo))}</td>
+            <td class="muted-col">${escapeHtml(formatUtcCompact(pt.tiempo))}</td>
+            <td class="num accent-col">${escapeHtml(formatNum(pt.prediccion))}</td>
+            <td class="num">${escapeHtml(formatNum(pt.limite_inferior))}</td>
+            <td class="num">${escapeHtml(formatNum(pt.limite_superior))}</td>
+            <td class="num muted-col">±${escapeHtml(formatNum(amplitud / 2))}</td>
+          </tr>
+        `;
+      }).join('');
+      tbody.innerHTML = rows;
+    }
+
+    function renderChart(data, params) {
+      const canvas = document.getElementById('forecast-chart');
+      const emptyState = document.getElementById('chart-empty-state');
+      const subtitleEl = document.getElementById('chart-subtitle');
+
+      if (subtitleEl) {
+        const pct = Math.round((data.confianza ?? params.confianza) * 100);
+        subtitleEl.textContent = `Eje temporal en hora de Colombia (America/Bogota, UTC−5) · Banda sombreada de intervalo de confianza al ${pct}%`;
+      }
+
+      if (!canvas || typeof Chart === 'undefined') return;
+      const historico = Array.isArray(data.historico) ? data.historico : [];
+      const prediccion = Array.isArray(data.prediccion) ? data.prediccion : [];
+
+      if (!historico.length && !prediccion.length) {
+        if (emptyState) emptyState.hidden = false;
+        return;
+      }
+      if (emptyState) emptyState.hidden = true;
+
+      const histCount = historico.length;
+      const labels = [
+        ...historico.map(function (p) { return formatColombiaShort(p.tiempo); }),
+        ...prediccion.map(function (p) { return formatColombiaShort(p.tiempo); })
+      ];
+      const rawTimes = [
+        ...historico.map(function (p) { return p.tiempo; }),
+        ...prediccion.map(function (p) { return p.tiempo; })
+      ];
+
+      const histSeries = [
+        ...historico.map(function (p) { return p.valor; }),
+        ...prediccion.map(function () { return null; })
+      ];
+
+      // Bridge prediction seamlessly from last observed point
+      const predSeries = new Array(histCount + prediccion.length).fill(null);
+      const upperSeries = new Array(histCount + prediccion.length).fill(null);
+      const lowerSeries = new Array(histCount + prediccion.length).fill(null);
+
+      if (histCount > 0 && prediccion.length > 0) {
+        const lastVal = historico[histCount - 1].valor;
+        predSeries[histCount - 1] = lastVal;
+        upperSeries[histCount - 1] = lastVal;
+        lowerSeries[histCount - 1] = lastVal;
+      }
+
+      prediccion.forEach(function (p, idx) {
+        const pos = histCount + idx;
+        predSeries[pos] = p.prediccion;
+        upperSeries[pos] = p.limite_superior;
+        lowerSeries[pos] = p.limite_inferior;
+      });
+
+      const colorData1 = getCssVar('--data-1', '#63c7d6');
+      const colorData2 = getCssVar('--data-2', '#87d69b');
+      const colorCiFill = getCssVar('--chart-ci-fill', 'rgba(99, 199, 214, 0.14)');
+      const colorCiBorder = getCssVar('--chart-ci-border', 'rgba(99, 199, 214, 0.42)');
+      const colorHistFill = getCssVar('--chart-hist-fill', 'rgba(135, 214, 155, 0.08)');
+      const colorGrid = getCssVar('--chart-grid', 'rgba(56, 81, 92, 0.35)');
+      const colorTextMuted = getCssVar('--on-surface-variant', '#94a8b0');
+      const colorSurface = getCssVar('--surface-container', '#152024');
+      const colorText = getCssVar('--on-surface', '#edf3f5');
+      const colorOutline = getCssVar('--outline', '#38515c');
+      const fontLabel = getCssVar('--font-label', 'monospace');
+
+      const splitIndex = histCount > 0 ? histCount - 1 : -1;
+
+      const splitLinePlugin = {
+        id: 'forecastSplitLine',
+        afterDraw: function (chart) {
+          if (splitIndex < 0 || !prediccion.length) return;
+          const xAxis = chart.scales.x;
+          const yAxis = chart.scales.y;
+          if (!xAxis || !yAxis) return;
+          const xPos = xAxis.getPixelForValue(splitIndex);
+          const ctx = chart.ctx;
+          ctx.save();
+          ctx.beginPath();
+          ctx.setLineDash([4, 4]);
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = colorOutline;
+          ctx.moveTo(xPos, yAxis.top);
+          ctx.lineTo(xPos, yAxis.bottom);
+          ctx.stroke();
+
+          ctx.fillStyle = colorTextMuted;
+          ctx.font = `500 11px ${fontLabel}`;
+          ctx.textAlign = 'center';
+          ctx.fillText('Corte observado → Pronóstico', Math.min(Math.max(xPos, yAxis.left + 95), xAxis.right - 95), yAxis.top + 14);
+          ctx.restore();
+        }
+      };
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      const ctx = canvas.getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Límite superior IC',
+              data: upperSeries,
+              borderColor: colorCiBorder,
+              borderWidth: 1,
+              borderDash: [4, 4],
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              fill: '+1',
+              backgroundColor: colorCiFill,
+              tension: 0.25,
+              spanGaps: false
+            },
+            {
+              label: 'Límite inferior IC',
+              data: lowerSeries,
+              borderColor: colorCiBorder,
+              borderWidth: 1,
+              borderDash: [4, 4],
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              fill: false,
+              tension: 0.25,
+              spanGaps: false
+            },
+            {
+              label: 'Pronóstico SARIMA',
+              data: predSeries,
+              borderColor: colorData1,
+              borderWidth: 2.5,
+              borderDash: [6, 4],
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              pointBackgroundColor: colorData1,
+              fill: false,
+              tension: 0.25,
+              spanGaps: false
+            },
+            {
+              label: 'Histórico observado',
+              data: histSeries,
+              borderColor: colorData2,
+              backgroundColor: colorHistFill,
+              borderWidth: 2,
+              pointRadius: histCount > 72 ? 0 : 2,
+              pointHoverRadius: 5,
+              pointBackgroundColor: colorData2,
+              fill: true,
+              tension: 0.2,
+              spanGaps: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: colorSurface,
+              titleColor: colorText,
+              bodyColor: colorText,
+              borderColor: colorOutline,
+              borderWidth: 1,
+              padding: 12,
+              titleFont: { family: fontLabel, size: 12, weight: '600' },
+              bodyFont: { family: fontLabel, size: 12 },
+              callbacks: {
+                title: function (items) {
+                  if (!items || !items.length) return '';
+                  const idx = items[0].dataIndex;
+                  const iso = rawTimes[idx];
+                  return `${formatColombiaFull(iso)} COT\nUTC: ${formatUtcCompact(iso)}`;
+                },
+                label: function (context) {
+                  if (context.parsed.y === null || context.parsed.y === undefined) return null;
+                  return `${context.dataset.label}: ${formatNum(context.parsed.y)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                color: colorGrid,
+                drawOnChartArea: false
+              },
+              ticks: {
+                color: colorTextMuted,
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: 10,
+                font: { family: fontLabel, size: 11 }
+              }
+            },
+            y: {
+              grid: {
+                color: colorGrid
+              },
+              ticks: {
+                color: colorTextMuted,
+                font: { family: fontLabel, size: 11 },
+                callback: function (value) {
+                  return formatNum(Number(value), 1);
+                }
+              }
+            }
+          }
+        },
+        plugins: [splitLinePlugin]
+      });
+    }
+
+    function renderMetaStrip(data, sourceLabel) {
+      const ctxEl = document.getElementById('meta-contexto');
+      const srcEl = document.getElementById('meta-fuente');
+      const updEl = document.getElementById('meta-actualizado');
+
+      if (ctxEl) {
+        const horasCtx = data.horas_contexto_usadas ?? '—';
+        const nHist = Array.isArray(data.historico) ? data.historico.length : 0;
+        const nPred = Array.isArray(data.prediccion) ? data.prediccion.length : 0;
+        ctxEl.textContent = `Contexto usado: ${horasCtx} h · Mostrando ${nHist} h históricas y ${nPred} h pronosticadas`;
+      }
+      if (srcEl) srcEl.textContent = sourceLabel;
+      if (updEl) {
+        const ahora = new Intl.DateTimeFormat('es-CO', {
+          timeZone: COLOMBIA_TZ,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }).format(new Date());
+        updEl.textContent = `Actualizado: ${ahora} COT`;
+      }
+    }
+
+    function applyForecastPayload(data, params, sourceLabel) {
+      currentForecastData = data;
+      const exportBtn = document.getElementById('btn-exportar');
+      if (exportBtn) exportBtn.disabled = false;
+
+      renderKPIs(data);
+      renderChart(data, params);
+      renderTable(data);
+      renderMetaStrip(data, sourceLabel);
+    }
+
+    function buildSimulatedPayload(params) {
+      const now = new Date();
+      now.setUTCMinutes(0, 0, 0);
+      const historico = [];
+      const prediccion = [];
+
+      for (let i = params.historia - 1; i >= 0; i--) {
+        const t = new Date(now.getTime() - i * 3600000);
+        const hourBogota = (t.getUTCHours() + 19) % 24;
+        const base = 185 + 78 * Math.sin(((hourBogota - 7) / 24) * Math.PI * 2);
+        const ripple = 14 * Math.cos(i * 0.45);
+        const valor = Math.max(45, Number((base + ripple).toFixed(2)));
+        historico.push({
+          tiempo: t.toISOString().replace('.000Z', 'Z'),
+          valor: valor
+        });
+      }
+
+      const zMap = { '0.8': 1.28, '0.9': 1.645, '0.95': 1.96, '0.99': 2.576 };
+      const z = zMap[String(params.confianza)] || 1.96;
+
+      for (let h = 1; h <= params.horas; h++) {
+        const t = new Date(now.getTime() + h * 3600000);
+        const hourBogota = (t.getUTCHours() + 19) % 24;
+        const expected = Math.max(50, Number((190 + 82 * Math.sin(((hourBogota - 7) / 24) * Math.PI * 2) + 8 * Math.sin(h * 0.35)).toFixed(2)));
+        const sigma = 14 + Math.sqrt(h) * 16.5;
+        const margin = z * sigma;
+        prediccion.push({
+          tiempo: t.toISOString().replace('.000Z', 'Z'),
+          prediccion: expected,
+          limite_inferior: Number(Math.max(0, expected - margin).toFixed(2)),
+          limite_superior: Number((expected + margin).toFixed(2))
+        });
+      }
+
+      const lastIso = historico.length ? historico[historico.length - 1].tiempo : now.toISOString().replace('.000Z', 'Z');
+      return {
+        ultima_observacion: lastIso,
+        horas_contexto_usadas: 336,
+        horas_rellenadas: 0,
+        confianza: params.confianza,
+        historico: historico,
+        prediccion: prediccion
+      };
+    }
+
+    async function actualizarPronostico() {
+      if (isFetching) return;
+      const params = getParamsFromControls();
+      syncPresetButtons(params.horas);
+
+      if (isPreviewSimulated && !hasConnectedLiveApi) {
+        const simData = buildSimulatedPayload(params);
+        applyForecastPayload(simData, params, 'Origen: Vista previa simulada (sin servidor FastAPI)');
+        return;
+      }
+
+      setLoadingState(true);
+      const url = `/api/prediccion?horas=${encodeURIComponent(params.horas)}&historia=${encodeURIComponent(params.historia)}&confianza=${encodeURIComponent(params.confianza)}`;
+
+      try {
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        const contentType = response.headers.get('content-type') || '';
+
+        if (!response.ok) {
+          let detail = `La API respondió con estado HTTP ${response.status}.`;
+          if (contentType.includes('application/json')) {
+            const errJson = await response.json();
+            if (errJson && errJson.detail) {
+              detail = typeof errJson.detail === 'string' ? errJson.detail : JSON.stringify(errJson.detail);
+            }
+          }
+          // If 404 HTML when opened outside FastAPI before ever connecting, offer preview option
+          const isStaticMissingBackend = !hasConnectedLiveApi && response.status === 404 && !contentType.includes('application/json');
+          if (isStaticMissingBackend) {
+            isPreviewSimulated = true;
+            showErrorBanner(
+              'Servidor FastAPI no detectado en /api/prediccion',
+              `El entorno actual devolvió HTTP 404 sin JSON. Mientras tanto se muestran datos locales simulados para explorar la interfaz.`,
+              `Al servir este archivo desde uvicorn app.main:app o Docker, la gráfica cargará automáticamente tus datos reales de InfluxDB.`,
+              false
+            );
+            const simData = buildSimulatedPayload(params);
+            applyForecastPayload(simData, params, 'Origen: Vista previa simulada (sin servidor FastAPI)');
+            setSimulatedHealthCard();
+            return;
+          }
+
+          clearDashboardOnFatalError();
+          showErrorBanner(
+            `Error de la API (HTTP ${response.status})`,
+            detail,
+            `Revisa la respuesta del backend en /api/salud, la conexión a InfluxDB o el modelo en models/sarima_config.json.`,
+            false
+          );
+          return;
+        }
+
+        if (!contentType.includes('application/json')) {
+          throw new Error('La respuesta del endpoint /api/prediccion no es JSON válido.');
+        }
+
+        const data = await response.json();
+        hasConnectedLiveApi = true;
+        isPreviewSimulated = false;
+        hideErrorBanner();
+        applyForecastPayload(data, params, 'Origen: /api/prediccion (datos en vivo)');
+      } catch (err) {
+        const msg = err && err.message ? err.message : 'Fallo de red al contactar /api/prediccion.';
+        if (!hasConnectedLiveApi) {
+          isPreviewSimulated = true;
+          showErrorBanner(
+            'No hay conexión con la API (/api/prediccion)',
+            `Detalle de red: ${msg}. Se activó la vista previa con datos simulados para permitir la exploración interactiva.`,
+            `Ejecuta uvicorn app.main:app --host 0.0.0.0 --port 8000 y presiona Reintentar para consultar datos reales.`,
+            false
+          );
+          const simData = buildSimulatedPayload(params);
+          applyForecastPayload(simData, params, 'Origen: Vista previa simulada (sin servidor FastAPI)');
+          setSimulatedHealthCard();
+        } else {
+          clearDashboardOnFatalError();
+          showErrorBanner(
+            'Pérdida de conexión con el servidor FastAPI',
+            msg,
+            `Verifica que el proceso uvicorn o el contenedor Docker continúe ejecutándose en el puerto 8000.`,
+            true
+          );
+        }
+      } finally {
+        setLoadingState(false);
+      }
+    }
+
+    function cargarVistaPreviaSimulada() {
+      isPreviewSimulated = true;
+      const params = getParamsFromControls();
+      showErrorBanner(
+        'Modo de vista previa simulada activo',
+        `Mostrando serie horaria sintética en memoria porque la API real falló o fue detenida.`,
+        `Pulsa Reintentar cuando el backend esté disponible para recuperar datos reales.`,
+        false
+      );
+      const simData = buildSimulatedPayload(params);
+      applyForecastPayload(simData, params, 'Origen: Vista previa simulada');
+    }
+
+    function reintentarConexion() {
+      isPreviewSimulated = false;
+      hideErrorBanner();
+      actualizarPronostico();
+      consultarSaludYModelo();
+    }
+
+    function simularErrorPrueba() {
+      clearDashboardOnFatalError();
+      showErrorBanner(
+        'Error simulado de la API (HTTP 503)',
+        `detail: "InfluxDB no devolvió datos para el measurement configurado o el modelo SARIMA no está cargado en models/sarima_config.json."`,
+        `Ejemplo de manejo de errores (Requisito 5). Haz clic en Reintentar para restablecer la conexión o la vista previa.`,
+        true
+      );
+    }
+
+    function setSimulatedHealthCard() {
+      const setText = function (id, val) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+      setText('salud-estado', 'Sin backend (modo vista previa)');
+      setText('salud-atendido', 'preview-local');
+      setText('salud-modelo', 'simulado');
+      setText('salud-influx', 'no conectado');
+      setText('salud-demo', 'true (local)');
+      setText('modelo-detalle', 'SARIMA(1,1,1)(1,1,1,24) · Demo');
+    }
+
+    async function consultarSaludYModelo() {
+      const setText = function (id, val) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+
+      try {
+        const resSalud = await fetch('/api/salud', { headers: { 'Accept': 'application/json' } });
+        if (resSalud.ok && (resSalud.headers.get('content-type') || '').includes('application/json')) {
+          const salud = await resSalud.json();
+          setText('salud-estado', salud.estado || 'OK (200)');
+          setText('salud-atendido', salud.atendido_por ?? '—');
+          setText('salud-modelo', String(salud.modelo_cargado ?? '—'));
+          setText('salud-influx', String(salud.influx_configurado ?? '—'));
+          setText('salud-demo', String(salud.modelo_demo ?? '—'));
+        } else if (!hasConnectedLiveApi) {
+          setSimulatedHealthCard();
+          return;
+        }
+      } catch (_err) {
+        if (!hasConnectedLiveApi) {
+          setSimulatedHealthCard();
+          return;
+        }
+        setText('salud-estado', 'Sin respuesta');
+      }
+
+      try {
+        const resMod = await fetch('/api/modelo', { headers: { 'Accept': 'application/json' } });
+        if (resMod.ok && (resMod.headers.get('content-type') || '').includes('application/json')) {
+          const mod = await resMod.json();
+          const orden = mod.order || mod.orden || mod.sarima_order;
+          const estacional = mod.seasonal_order || mod.orden_estacional;
+          const mae = mod.mae ?? mod.metricas?.mae;
+          const parts = [];
+          if (orden) parts.push(`Orden ${JSON.stringify(orden)}`);
+          if (estacional) parts.push(`Est. ${JSON.stringify(estacional)}`);
+          if (mae !== undefined) parts.push(`MAE ${formatNum(Number(mae))}`);
+          setText('modelo-detalle', parts.length ? parts.join(' · ') : 'Modelo cargado');
+        }
+      } catch (_err) {
+        // Non-blocking diagnostic info
+      }
+    }
+
+    function exportarCSV() {
+      if (!currentForecastData || !Array.isArray(currentForecastData.prediccion)) return;
+      const lines = ['hora_colombia_utc_minus_5,timestamp_utc,prediccion,limite_inferior,limite_superior'];
+      currentForecastData.prediccion.forEach(function (pt) {
+        lines.push([
+          `"${formatColombiaFull(pt.tiempo)}"`,
+          pt.tiempo,
+          pt.prediccion,
+          pt.limite_inferior,
+          pt.limite_superior
+        ].join(','));
+      });
+      const csvContent = lines.join('\n');
+
+      if (window.notebookAppApi && typeof window.notebookAppApi.triggerFileDownload === 'function') {
+        window.notebookAppApi.triggerFileDownload({
+          content: csvContent,
+          contentType: 'text/csv',
+          encoding: 'UTF-8',
+          filename: 'pronostico_colombia.csv'
+        });
+        return;
+      }
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'pronostico_colombia.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    async function inicializarAplicacion() {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+
+      if (window.notebookAppApi && typeof window.notebookAppApi.getAppState === 'function') {
+        try {
+          const saved = await window.notebookAppApi.getAppState();
+          if (saved) {
+            const inputH = document.getElementById('input-horas');
+            const selHist = document.getElementById('select-historia');
+            const selConf = document.getElementById('select-confianza');
+            if (inputH && saved.horas) inputH.value = String(saved.horas);
+            if (selHist && saved.historia) selHist.value = String(saved.historia);
+            if (selConf && saved.confianza) selConf.value = String(saved.confianza);
+            syncPresetButtons(saved.horas || 12);
+          }
+        } catch (_err) {
+          // Proceed with defaults
+        }
+      }
+
+      await Promise.all([
+        actualizarPronostico(),
+        consultarSaludYModelo()
+      ]);
+
+      if (window.notebookAppApi && typeof window.notebookAppApi.notifyAppReady === 'function') {
+        window.notebookAppApi.notifyAppReady();
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', inicializarAplicacion);
+  </script>
 </body>
 </html>
